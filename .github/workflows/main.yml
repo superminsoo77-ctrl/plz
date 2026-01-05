@@ -34,6 +34,7 @@ jobs:
             -e "ssh -i ~/.ssh/deploy.key" \
             dist/ \
             ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_HOST }}:~/dist/
+            
       - name: bastion에서 nginx로 파일 이동 후 재시작
         run: |
           ssh -i ~/.ssh/deploy.key \
