@@ -1,48 +1,60 @@
-name: Bastion
+name: Bastion Deploy
+
 on:
   push:
     branches:
       - main
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
+      # 1️⃣ 소스 체크아웃
       - name: Checkout source
         uses: actions/checkout@v4
+
+      # 2️⃣ Node.js 세팅
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: npm
+
+      # 3️⃣ 의존성 설치
       - name: Install dependencies
         run: npm ci
-      - name: React 파일 빌드
+
+      # 4️⃣ React 빌드
+      - name: Build React
         run: npm run build
-      - name: ssh 키 접속
+
+      # 5️⃣ SSH 키 설정
+      - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.BASTION_SSH_KEY }}" > ~/.ssh/deploy.key
           chmod 600 ~/.ssh/deploy.key
-          ssh-keyscan -T 5 -H ${{ secrets.BASTION_HOST }} >> ~/.ssh/known_hosts || true
-          
-      - name: bastion에 파일 업로드
+          ssh-keyscan -H ${{ secrets.BASTION_HOST }} >> ~/.ssh/known_hosts || true
+          # 내부 Nginx 서버도 필요하면 IP 추가
+          ssh-keyscan -H ${{ secrets.NGINX_IP }} >> ~/.ssh/known_hosts || true
+
+      # 6️⃣ Bastion 서버로 파일 업로드
+      - name: Upload files to Bastion
         run: |
-          ssh -i ~/.ssh/deploy.key \
-            ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_HOST }} \
-            "mkdir -p ~/dist && rm -rf ~/dist/*"
-          rsync -avz \
-            -e "ssh -i ~/.ssh/deploy.key" \
-            dist/ \
+          rsync -avz -e "ssh -i ~/.ssh/deploy.key" dist/ \
             ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_HOST }}:~/dist/
-            
-      - name: bastion에서 nginx로 파일 이동 후 재시작
+
+      # 7️⃣ Bastion에서 내부 Nginx 서버로 배포
+      - name: Deploy to Nginx via Bastion
         run: |
-          ssh -i ~/.ssh/deploy.key \
-            ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_HOST }} "
-              rsync -avz ~/dist/ nginx2a:/home/ubuntu/dist/ &&
-              ssh nginx2a '
-                sudo rm -rf /var/www/react/* &&
-                sudo cp -r /home/ubuntu/dist/* /var/www/react/ &&
-                sudo systemctl reload nginx
-              '
-            "
+          ssh -i ~/.ssh/deploy.key ${{ secrets.BASTION_USER }}@${{ secrets.BASTION_HOST }} "
+            # 내부 서버로 파일 전송
+            rsync -avz ~/dist/ ubuntu@${{ secrets.NGINX_IP }}:/home/ubuntu/dist/ &&
+            ssh -i ~/.ssh/deploy.key ubuntu@${{ secrets.NGINX_IP }} '
+              # 기존 파일 삭제 후 복사
+              sudo rm -rf /var/www/react/* &&
+              sudo cp -r /home/ubuntu/dist/* /var/www/react/ &&
+              sudo systemctl reload nginx
+            '
+          "
