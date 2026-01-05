@@ -23,7 +23,7 @@ const Recommendations = () => {
     <div>
       <h3 style={{ fontSize: "20px", fontWeight: "600" }}>AI 추천 관리</h3>
       <p style={{ fontSize: "13px", color: "#6b7280" }}>
-        특정 구매자 ID를 기준으로 FastAPI + Python 모델이 추천한 상품 목록을 조회합니다.
+        Python 모델이 추천한 상품 목록을 조회합니다.
       </p>
 
       <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
